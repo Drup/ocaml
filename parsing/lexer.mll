@@ -511,8 +511,22 @@ rule token = parse
             { INFIXOP3(Lexing.lexeme lexbuf) }
   | '#' (symbolchar | '#') +
             { HASHOP(Lexing.lexeme lexbuf) }
+  | ':' ['|' '&' '$'] constructorchar *
+  (* := and :> are invalid operators since  COLONEQUAL and COLONGREATER already exist.
+     :< is invalid because [ x:<foo:bar> ] is valid. *)
+  | ':' ['=' '>' '<'] constructorchar +
+            { INFIXCONSTRUCTOR0(Lexing.lexeme lexbuf) }
+  | ':' ['@' '^'] constructorchar *
+            { INFIXCONSTRUCTOR1(Lexing.lexeme lexbuf) }
   | "::" constructorchar *
-            { INFIXCONSTRUCTOR(Lexing.lexeme lexbuf) }
+            { INFIXCONSTRUCTOR1BIS(Lexing.lexeme lexbuf) }
+  | ':' ['+' '-'] constructorchar *
+            { INFIXCONSTRUCTOR2(Lexing.lexeme lexbuf) }
+  | ':' "**" constructorchar *
+            { INFIXCONSTRUCTOR4(Lexing.lexeme lexbuf) }
+  | ':' ['*' '/' '%'] constructorchar *
+            { INFIXCONSTRUCTOR3(Lexing.lexeme lexbuf) }
+
   | eof { EOF }
   | _
       { raise (Error(Illegal_character (Lexing.lexeme_char lexbuf 0),
