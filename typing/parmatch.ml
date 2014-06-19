@@ -353,6 +353,123 @@ let get_constructor_type_path ty tenv =
   | Tconstr (path,_,_) -> path
   | _ -> assert false
 
+(*************************************)
+(* Values as patterns pretty printer *)
+(*************************************)
+
+open Format
+;;
+
+let is_infix_construct cstr = cstr.cstr_name.[0] = ':'
+
+let pretty_const c = match c with
+| Const_int i -> Printf.sprintf "%d" i
+| Const_char c -> Printf.sprintf "%C" c
+| Const_string (s, _) -> Printf.sprintf "%S" s
+| Const_float f -> Printf.sprintf "%s" f
+| Const_int32 i -> Printf.sprintf "%ldl" i
+| Const_int64 i -> Printf.sprintf "%LdL" i
+| Const_nativeint i -> Printf.sprintf "%ndn" i
+
+let rec pretty_val ppf v =
+  match v.pat_extra with
+      (cstr, _loc, _attrs) :: rem ->
+        begin match cstr with
+          | Tpat_unpack ->
+            fprintf ppf "@[(module %a)@]" pretty_val { v with pat_extra = rem }
+          | Tpat_constraint ctyp ->
+            fprintf ppf "@[(%a : _)@]" pretty_val { v with pat_extra = rem }
+          | Tpat_type _ ->
+            fprintf ppf "@[(# %a)@]" pretty_val { v with pat_extra = rem }
+        end
+    | [] ->
+  match v.pat_desc with
+  | Tpat_any -> fprintf ppf "_"
+  | Tpat_var (x,_) -> Ident.print ppf x
+  | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
+  | Tpat_tuple vs ->
+      fprintf ppf "@[(%a)@]" (pretty_vals ",") vs
+  | Tpat_construct (_, cstr, []) ->
+      fprintf ppf "%s" cstr.cstr_name
+  | Tpat_construct (_, cstr, [w]) ->
+      fprintf ppf "@[<2>%s@ %a@]" cstr.cstr_name pretty_arg w
+  | Tpat_construct (_, cstr, [v1;v2]) when is_infix_construct cstr ->
+      fprintf ppf "@[(%a)@,%s@,(%a)@]" pretty_val v1 cstr.cstr_name pretty_val v2
+  | Tpat_construct (_, cstr, vs) when is_infix_construct cstr ->
+      fprintf ppf "@[<2>(%s)@ @[(%a)@]@]" cstr.cstr_name (pretty_vals ",") vs
+  | Tpat_construct (_, cstr, vs) ->
+      fprintf ppf "@[<2>%s@ @[(%a)@]@]" cstr.cstr_name (pretty_vals ",") vs
+  | Tpat_variant (l, None, _) ->
+      fprintf ppf "`%s" l
+  | Tpat_variant (l, Some w, _) ->
+      fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
+  | Tpat_record (lvs,_) ->
+      fprintf ppf "@[{%a}@]"
+        pretty_lvals
+        (List.filter
+           (function
+             | (_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
+             | _ -> true) lvs)
+  | Tpat_array vs ->
+      fprintf ppf "@[[| %a |]@]" (pretty_vals " ;") vs
+  | Tpat_lazy v ->
+      fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
+  | Tpat_alias (v, x,_) ->
+      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
+  | Tpat_or (v,w,_)    ->
+      fprintf ppf "@[(%a|@,%a)@]" pretty_or v pretty_or w
+
+and pretty_arg ppf v = match v.pat_desc with
+| Tpat_construct (_,_,_::_) -> fprintf ppf "(%a)" pretty_val v
+|  _ -> pretty_val ppf v
+
+and pretty_or ppf v = match v.pat_desc with
+| Tpat_or (v,w,_) ->
+    fprintf ppf "%a|@,%a" pretty_or v pretty_or w
+| _ -> pretty_val ppf v
+
+and pretty_vals sep ppf = function
+  | [] -> ()
+  | [v] -> pretty_val ppf v
+  | v::vs ->
+      fprintf ppf "%a%s@ %a" pretty_val v sep (pretty_vals sep) vs
+
+and pretty_lvals ppf = function
+  | [] -> ()
+  | [_,lbl,v] ->
+      fprintf ppf "%s=%a" lbl.lbl_name pretty_val v
+  | (_, lbl,v)::rest ->
+      fprintf ppf "%s=%a;@ %a"
+        lbl.lbl_name pretty_val v pretty_lvals rest
+
+let top_pretty ppf v =
+  fprintf ppf "@[%a@]@?" pretty_val v
+
+
+let pretty_pat p =
+  top_pretty Format.str_formatter p ;
+  prerr_string (Format.flush_str_formatter ())
+
+type matrix = pattern list list
+
+let pretty_line ps =
+  List.iter
+    (fun p ->
+      top_pretty Format.str_formatter p ;
+      prerr_string " <" ;
+      prerr_string (Format.flush_str_formatter ()) ;
+      prerr_string ">")
+    ps
+
+let pretty_matrix (pss : matrix) =
+  prerr_endline "begin matrix" ;
+  List.iter
+    (fun ps ->
+      pretty_line ps ;
+      prerr_endline "")
+    pss ;
+  prerr_endline "end matrix"
+
 (****************************)
 (* Utilities for matching   *)
 (****************************)

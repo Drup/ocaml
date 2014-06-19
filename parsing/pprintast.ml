@@ -30,7 +30,10 @@ open Ast_helper
 
 let prefix_symbols  = [ '!'; '?'; '~' ] ;;
 let infix_symbols = [ '='; '<'; '>'; '@'; '^'; '|'; '&'; '+'; '-'; '*'; '/';
-                      '$'; '%'; '#' ]
+                      '$'; '%' ; '#' ; ':' ]
+let operator_chars = [ '!'; '$'; '%'; '&'; '*'; '+'; '-'; '.'; '/';
+                       ':'; '<'; '='; '>'; '?'; '@'; '^'; '|'; '~' ]
+let numeric_chars  = [ '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' ]
 
 (* type fixity = Infix| Prefix  *)
 let special_infix_strings =
@@ -386,6 +389,10 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
           pp f "%a" pattern_list_helper x
         else
           (match po with
+           | Some ({ppat_desc = Ppat_tuple([pat1; pat2]);_}) when s.[0] = ':' ->
+               pp f "(%a) %a (%a)"  self#simple_pattern  pat1 self#longident_loc li self#simple_pattern pat2
+           | Some x when s.[0] = ':' ->
+               pp f "(%a)@;%a"  self#longident_loc li self#simple_pattern x
            | Some x -> pp f "%a@;%a"  longident_loc li (simple_pattern ctxt) x
            | None -> pp f "%a" longident_loc li)
     | _ -> simple_pattern ctxt f x
@@ -611,10 +618,17 @@ and expression ctxt f x =
                 end (e,l)
         end
 
-    | Pexp_construct (li, Some eo)
+    | Pexp_construct ({txt= Lident s ;_} as li, Some eo)
       when not (is_simple_construct (view_expr x))-> (* Not efficient FIXME*)
         (match view_expr x with
          | `cons ls -> list (simple_expr ctxt) f ls ~sep:"@;::@;"
+         | `normal when s.[0] = ':' ->
+             begin match eo with
+             | ({pexp_desc= Pexp_tuple([e1;e2]);_}) ->
+                 pp f "@[<2>%a@;%s@;%a@]" self#simple_expr e1  s  self#simple_expr e2
+             | _ ->
+                 pp f "@[<2>(%a)@;%a@]" self#longident_loc li  self#simple_expr eo
+             end
          | `normal ->
              pp f "@[<2>%a@;%a@]" longident_loc li
                (simple_expr ctxt) eo
