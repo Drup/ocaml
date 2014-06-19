@@ -290,8 +290,10 @@ let lowercase_latin1 = ['a'-'z' '\223'-'\246' '\248'-'\255' '_']
 let uppercase_latin1 = ['A'-'Z' '\192'-'\214' '\216'-'\222']
 let identchar_latin1 =
   ['A'-'Z' 'a'-'z' '_' '\192'-'\214' '\216'-'\246' '\248'-'\255' '\'' '0'-'9']
+let constructorchar =
+  ['$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '@' '^' '|']
 let symbolchar =
-  ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '|' '~']
+  constructorchar | ['!' '?' '~']
 let dotsymbolchar =
   ['!' '$' '%' '&' '*' '+' '-' '/' ':' '=' '>' '?' '@' '^' '|' '~']
 let decimal_literal =
@@ -458,7 +460,6 @@ rule token = parse
   | ".." { DOTDOT }
   | "." (dotsymbolchar symbolchar* as s) { DOTOP s }
   | ":"  { COLON }
-  | "::" { COLONCOLON }
   | ":=" { COLONEQUAL }
   | ":>" { COLONGREATER }
   | ";"  { SEMI }
@@ -510,6 +511,8 @@ rule token = parse
             { INFIXOP3(Lexing.lexeme lexbuf) }
   | '#' (symbolchar | '#') +
             { HASHOP(Lexing.lexeme lexbuf) }
+  | "::" constructorchar *
+            { INFIXCONSTRUCTOR(Lexing.lexeme lexbuf) }
   | eof { EOF }
   | _
       { raise (Error(Illegal_character (Lexing.lexeme_char lexbuf 0),
