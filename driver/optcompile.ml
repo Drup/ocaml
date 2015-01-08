@@ -42,6 +42,21 @@ let interface ppf sourcefile outputprefix =
   ignore (Includemod.signatures initial_env sg sg);
   Typecore.force_delayed_checks ();
   Warnings.check_fatal ();
+
+  (* And again. *)
+  Compmisc.init_path false;
+  Env.set_unit_name modulename;
+
+  fprintf std_formatter "First typing done.@." ;
+  let ast = Untypeast.untype_signature tsg in
+  fprintf ppf "%a@." Pprintast.signature ast ;
+  let tsg = Typemod.type_interface initial_env ast in
+  let sg = tsg.sig_type in
+  ignore (Includemod.signatures initial_env sg sg);
+  Typecore.force_delayed_checks ();
+  Warnings.check_fatal ();
+  fprintf std_formatter "Second typing done.@." ;
+
   if not !Clflags.print_types then begin
     let sg = Env.save_signature sg modulename (outputprefix ^ ".cmi") in
     Typemod.save_signature modulename tsg outputprefix sourcefile
@@ -82,6 +97,21 @@ let implementation ppf sourcefile outputprefix =
       ++ Typemod.type_implementation sourcefile outputprefix modulename env
       ++ print_if ppf Clflags.dump_typedtree
           Printtyped.implementation_with_coercion
+
+      ++ (fun (typedtree,_) ->
+        fprintf std_formatter "First typing done.@." ;
+
+        Compmisc.init_path true;
+        Env.set_unit_name modulename;
+        let env = Compmisc.initial_env () in
+        let ast = Untypeast.untype_structure typedtree in
+        fprintf ppf "%a@." Pprintast.structure ast ;
+        let x = Typemod.type_implementation sourcefile outputprefix modulename env ast in
+        fprintf std_formatter "Second typing done.@." ;
+        print_if ppf Clflags.dump_typedtree
+          Printtyped.implementation_with_coercion x
+      )
+
       ++ Translmod.transl_store_implementation modulename
       +++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
       +++ Simplif.simplify_lambda
