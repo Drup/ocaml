@@ -2383,6 +2383,8 @@ OCaml 4.03.0 (25 Apr 2016):
 - GPR#88: allow field punning in object copying expressions:
   {< x; y; >} is sugar for {< x = x; y = y; >}
   (Jeremy Yallop)
+- GPR#218: Add the syntax "M.!( ... )" that opens a module locally but doesn't trigger shadowing warnings.
+  (Gabriel Radanne and 'Octachron')
 
 - GPR#112: octal escape sequences for char and string literals
   "Make it \o033[1mBOLD\o033[0m"
