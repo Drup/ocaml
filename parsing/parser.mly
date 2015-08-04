@@ -39,9 +39,11 @@ let mkrhs rhs pos = mkloc rhs (rhs_loc pos)
 let reloc_pat x = { x with ppat_loc = symbol_rloc () };;
 let reloc_exp x = { x with pexp_loc = symbol_rloc () };;
 
-let mkoperator name pos =
+let mkoperator_lident name pos =
   let loc = rhs_loc pos in
-  Exp.mk ~loc (Pexp_ident(mkloc (Lident name) loc))
+  Exp.mk ~loc (Pexp_ident(mkloc name loc))
+
+let mkoperator name pos = mkoperator_lident (Lident name) pos
 
 let mkpatvar name pos =
   Pat.mk ~loc:(rhs_loc pos) (Ppat_var (mkrhs name pos))
@@ -72,8 +74,10 @@ let ghstr d = Str.mk ~loc:(symbol_gloc()) d
 let ghunit () =
   ghexp (Pexp_construct (mknoloc (Lident "()"), None))
 
-let mkinfix arg1 name arg2 =
-  mkexp(Pexp_apply(mkoperator name 2, [Nolabel, arg1; Nolabel, arg2]))
+let mkinfix_lident arg1 name arg2 =
+  mkexp(Pexp_apply(mkoperator_lident name 2, [Nolabel, arg1; Nolabel, arg2]))
+
+let mkinfix arg1 name arg2 = mkinfix_lident arg1 (Lident name) arg2
 
 let neg_float_string f =
   if String.length f > 0 && f.[0] = '-'
@@ -1278,8 +1282,8 @@ expr:
       { mkexp_cons (rhs_loc 2) (ghexp(Pexp_tuple[$1;$3])) (symbol_rloc()) }
   | LPAREN COLONCOLON RPAREN LPAREN expr COMMA expr RPAREN
       { mkexp_cons (rhs_loc 2) (ghexp(Pexp_tuple[$5;$7])) (symbol_rloc()) }
-  | expr INFIXOP0 expr
-      { mkinfix $1 $2 $3 }
+  | expr infixop0 expr %prec INFIXOP0
+      { mkinfix_lident $1 $2 $3 }
   | expr INFIXOP1 expr
       { mkinfix $1 $2 $3 }
   | expr INFIXOP2 expr
@@ -2201,6 +2205,10 @@ operator:
   | PLUSEQ                                      { "+=" }
   | PERCENT                                     { "%" }
   | index_operator                              { $1 }
+;
+infixop0:
+  | INFIXOP0 { Lident $1 }
+  | mod_longident DOT INFIXOP0  { Ldot($1, $3) }
 ;
 index_operator:
     DOT index_operator_core opt_assign_arrow { $2^$3 }
