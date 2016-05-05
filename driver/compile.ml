@@ -49,10 +49,10 @@ let emit_bytecode i bytecode =
     Misc.remove_file objfile;
     raise x
 
+let frontend info = typecheck_impl info @@ parse_impl info
+let backend info typed = emit_bytecode info @@ to_bytecode info typed
+
 let implementation ppf sourcefile outputprefix =
   let info = init ppf ~init_path:false ~tool_name ~sourcefile ~outputprefix in
-
-  let frontend info = typecheck_impl info @@ parse_impl info in
-  let backend info typed = emit_bytecode info @@ to_bytecode info typed in
 
   wrap_compilation ~frontend ~backend info
