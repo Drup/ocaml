@@ -2688,10 +2688,13 @@ let fmt_ebb_of_string ?legacy_behavior str =
         raise Not_found
     with Not_found ->
       let Fmt_EBB fmt_rest = parse str_ind end_ind in
-      let sub_format = Format (End_of_format, "") in
-      let formatting =
-        if is_open_tag then Open_tag sub_format else Open_box sub_format in
-      Fmt_EBB (Formatting_gen (formatting, fmt_rest))
+      if is_open_tag then
+        let formatting = Open_stag in
+        Fmt_EBB (Formatting_gen (formatting, fmt_rest))
+      else
+        let sub_format = Format (End_of_format, "") in 
+        let formatting = Open_box sub_format in
+        Fmt_EBB (Formatting_gen (formatting, fmt_rest))
 
   (* Try to read the optional <width offset> after "@;". *)
   and parse_good_break : type e f . int -> int -> (_, _, e, f) fmt_ebb =
