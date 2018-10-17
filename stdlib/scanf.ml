@@ -1226,6 +1226,7 @@ fun k fmt -> match fmt with
   | Formatting_lit (_, rest)         -> take_format_readers k rest
   | Formatting_gen (Open_tag (Format (fmt, _)), rest) ->
       take_format_readers k (concat_fmt fmt rest)
+  | Formatting_gen (Open_stag, rest) -> take_format_readers k rest
   | Formatting_gen (Open_box (Format (fmt, _)), rest) ->
       take_format_readers k (concat_fmt fmt rest)
 
@@ -1260,6 +1261,7 @@ fun k fmtty fmt -> match fmtty with
   | Alpha_ty rest               -> take_fmtty_format_readers k rest fmt
   | Theta_ty rest               -> take_fmtty_format_readers k rest fmt
   | Any_ty rest                 -> take_fmtty_format_readers k rest fmt
+  | Stag_ty rest                -> take_fmtty_format_readers k rest fmt
   | Format_arg_ty (_, rest)     -> take_fmtty_format_readers k rest fmt
   | End_of_fmtty                -> take_format_readers k fmt
   | Format_subst_ty (ty1, ty2, rest) ->
@@ -1444,6 +1446,8 @@ fun ib fmt readers -> match fmt with
   | Formatting_gen (Open_tag (Format (fmt', _)), rest) ->
     check_char ib '@'; check_char ib '{';
     make_scanf ib (concat_fmt fmt' rest) readers
+  | Formatting_gen (Open_stag, _rest) ->
+    invalid_arg "scanf: bad conversion \"@{\""
   | Formatting_gen (Open_box (Format (fmt', _)), rest) ->
     check_char ib '@'; check_char ib '[';
     make_scanf ib (concat_fmt fmt' rest) readers

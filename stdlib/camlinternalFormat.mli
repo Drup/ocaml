@@ -34,6 +34,7 @@ val param_format_of_ignored_format :
   ('a, 'b, 'c, 'd, 'e, 'f) param_format_ebb
 
 type ('b, 'c) acc_formatting_gen =
+  | Acc_open_stag of stag
   | Acc_open_tag of ('b, 'c) acc
   | Acc_open_box of ('b, 'c) acc
 

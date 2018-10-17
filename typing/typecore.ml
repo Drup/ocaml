@@ -3362,6 +3362,8 @@ and type_format loc str env =
         fun fmting -> match fmting with
         | Open_tag (Format (fmt', str')) ->
           mk_constr "Open_tag" [ mk_format fmt' str' ]
+        | Open_stag ->
+          mk_constr "Open_stag" []
         | Open_box (Format (fmt', str')) ->
           mk_constr "Open_box" [ mk_format fmt' str' ]
       and mk_format : type a b c d e f .
@@ -3430,6 +3432,7 @@ and type_format loc str env =
         | Alpha_ty rest     -> mk_constr "Alpha_ty"     [ mk_fmtty rest ]
         | Theta_ty rest     -> mk_constr "Theta_ty"     [ mk_fmtty rest ]
         | Any_ty rest       -> mk_constr "Any_ty"       [ mk_fmtty rest ]
+        | Stag_ty rest      -> mk_constr "Stag_ty"       [ mk_fmtty rest ]
         | Reader_ty rest    -> mk_constr "Reader_ty"    [ mk_fmtty rest ]
         | Ignored_reader_ty rest ->
           mk_constr "Ignored_reader_ty" [ mk_fmtty rest ]

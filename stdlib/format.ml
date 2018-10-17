@@ -80,7 +80,7 @@ type pp_token =
   | Pp_open_tag of stag         (* opening a tag name *)
   | Pp_close_tag               (* closing the most recently open tag *)
 
-and stag = ..
+and stag = CamlinternalFormatBasics.stag = ..
 
 and tbox = Pp_tbox of int list ref  (* Tabulation box *)
 
@@ -1200,6 +1200,9 @@ let rec output_acc ppf acc = match acc with
   | Acc_formatting_gen (p, Acc_open_tag acc') ->
     output_acc ppf p;
     pp_open_stag ppf (String_tag (compute_tag output_acc acc'))
+  | Acc_formatting_gen (p, Acc_open_stag stag) ->
+    output_acc ppf p;
+    pp_open_stag ppf stag
   | Acc_formatting_gen (p, Acc_open_box acc') ->
     output_acc ppf p;
     let (indent, bty) = open_box_of_string (compute_tag output_acc acc') in
@@ -1235,6 +1238,9 @@ let rec strput_acc ppf acc = match acc with
   | Acc_formatting_gen (p, Acc_open_tag acc') ->
     strput_acc ppf p;
     pp_open_stag ppf (String_tag (compute_tag strput_acc acc'))
+  | Acc_formatting_gen (p, Acc_open_stag stag) ->
+    strput_acc ppf p;
+    pp_open_stag ppf stag
   | Acc_formatting_gen (p, Acc_open_box acc') ->
     strput_acc ppf p;
     let (indent, bty) = open_box_of_string (compute_tag strput_acc acc') in

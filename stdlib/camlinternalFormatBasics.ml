@@ -13,6 +13,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Semantic tags *)
+type stag = ..
+
 (* Padding position. *)
 type padty =
   | Left   (* Text is left justified ('-' option).               *)
@@ -250,6 +253,7 @@ type formatting_lit =
 type ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen =
   | Open_tag : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->      (* @{   *)
     ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen
+  | Open_stag : (stag -> 'f, 'b, 'c, 'e, 'e, 'f) formatting_gen
   | Open_box : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->      (* @[   *)
     ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen
 
@@ -337,6 +341,11 @@ and ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
       ('x -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'x -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
+  | Stag_ty :                                    (* Semantic stags *)
+      ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
+       'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
+      (stag -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
+       stag -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
 
   (* Scanf specific constructor. *)
   | Reader_ty :                                               (* %r  *)
@@ -549,6 +558,8 @@ let rec erase_rel : type a b c d e f g h i j k l .
     Theta_ty (erase_rel rest)
   | Any_ty rest ->
     Any_ty (erase_rel rest)
+  | Stag_ty rest ->
+    Stag_ty (erase_rel rest)
   | Reader_ty rest ->
     Reader_ty (erase_rel rest)
   | Ignored_reader_ty rest ->
@@ -604,6 +615,8 @@ fun fmtty1 fmtty2 -> match fmtty1 with
     Theta_ty (concat_fmtty rest fmtty2)
   | Any_ty rest ->
     Any_ty (concat_fmtty rest fmtty2)
+  | Stag_ty rest ->
+    Stag_ty (concat_fmtty rest fmtty2)
   | Reader_ty rest ->
     Reader_ty (concat_fmtty rest fmtty2)
   | Ignored_reader_ty rest ->

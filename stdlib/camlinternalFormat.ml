@@ -117,6 +117,7 @@ fun ign fmt -> match ign with
                                  (* Types *)
 
 type ('b, 'c) acc_formatting_gen =
+  | Acc_open_stag of stag
   | Acc_open_tag of ('b, 'c) acc
   | Acc_open_box of ('b, 'c) acc
 
@@ -474,6 +475,7 @@ let string_of_formatting_gen : type a b c d e f .
   fun formatting_gen -> match formatting_gen with
   | Open_tag (Format (_, str)) -> str
   | Open_box (Format (_, str)) -> str
+  | Open_stag -> "@{"
 
 (***)
 
@@ -506,6 +508,7 @@ fun buf fmtty -> match fmtty with
   | Alpha_ty rest     -> buffer_add_string buf "%a";  bprint_fmtty buf rest;
   | Theta_ty rest     -> buffer_add_string buf "%t";  bprint_fmtty buf rest;
   | Any_ty rest       -> buffer_add_string buf "%?";  bprint_fmtty buf rest;
+  | Stag_ty rest      -> buffer_add_string buf "@{";  bprint_fmtty buf rest;
   | Reader_ty rest    -> buffer_add_string buf "%r";  bprint_fmtty buf rest;
 
   | Ignored_reader_ty rest ->
@@ -668,6 +671,7 @@ let rec symm : type a1 b1 c1 d1 e1 f1 a2 b2 c2 d2 e2 f2 .
   | Theta_ty rest -> Theta_ty (symm rest)
   | Alpha_ty rest -> Alpha_ty (symm rest)
   | Any_ty rest -> Any_ty (symm rest)
+  | Stag_ty rest -> Stag_ty (symm rest)
   | Reader_ty rest -> Reader_ty (symm rest)
   | Ignored_reader_ty rest -> Ignored_reader_ty (symm rest)
   | Format_arg_ty (ty, rest) ->
@@ -741,6 +745,11 @@ let rec fmtty_rel_det : type a1 b c d1 e1 f1 a2 d2 e2 f2 .
     (fun Refl -> let Refl = af Refl in Refl),
     ed, de
   | Any_ty rest ->
+    let fa, af, ed, de = fmtty_rel_det rest in
+    (fun Refl -> let Refl = fa Refl in Refl),
+    (fun Refl -> let Refl = af Refl in Refl),
+    ed, de
+  | Stag_ty rest ->
     let fa, af, ed, de = fmtty_rel_det rest in
     (fun Refl -> let Refl = fa Refl in Refl),
     (fun Refl -> let Refl = af Refl in Refl),
@@ -819,6 +828,10 @@ and trans : type
   | Any_ty _, _ -> assert false
   | _, Any_ty _ -> assert false
 
+  | Stag_ty rest1, Stag_ty rest2 -> Stag_ty (trans rest1 rest2)
+  | Stag_ty _, _ -> assert false
+  | _, Stag_ty _ -> assert false
+
   | Reader_ty rest1, Reader_ty rest2 -> Reader_ty (trans rest1 rest2)
   | Reader_ty _, _ -> assert false
   | _, Reader_ty _ -> assert false
@@ -852,6 +865,7 @@ let rec fmtty_of_formatting_gen : type a b c d e f .
     (a, b, c, d, e, f) fmtty =
 fun formatting_gen -> match formatting_gen with
   | Open_tag (Format (fmt, _)) -> fmtty_of_fmt fmt
+  | Open_stag -> Any_ty End_of_fmtty
   | Open_box (Format (fmt, _)) -> fmtty_of_fmt fmt
 
 (* Extract the type representation (an fmtty) of a format. *)
@@ -1136,13 +1150,17 @@ and type_formatting_gen : type a1 a3 b1 b3 c1 c3 d1 d3 e1 e2 e3 f1 f2 f3 .
     (f1, b1, c1, e1, e2, f2) fmt ->
     (a3, b3, c3, d3, e3, f3) fmtty ->
     (a3, b3, c3, d3, e3, f3) fmt_fmtty_ebb =
-fun formatting_gen fmt0 fmtty0 -> match formatting_gen with
-  | Open_tag (Format (fmt1, str)) ->
-    let Fmt_fmtty_EBB (fmt2, fmtty2) = type_format_gen fmt1 fmtty0 in
+fun formatting_gen fmt0 fmtty0 -> match formatting_gen, fmtty0 with
+  | Open_tag (Format (fmt1, str)), fmtty_rest ->
+    let Fmt_fmtty_EBB (fmt2, fmtty2) = type_format_gen fmt1 fmtty_rest in
     let Fmt_fmtty_EBB (fmt3, fmtty3) = type_format_gen fmt0 fmtty2 in
     Fmt_fmtty_EBB (Formatting_gen (Open_tag (Format (fmt2, str)), fmt3), fmtty3)
-  | Open_box (Format (fmt1, str)) ->
-    let Fmt_fmtty_EBB (fmt2, fmtty2) = type_format_gen fmt1 fmtty0 in
+  | Open_stag, Stag_ty fmtty_rest ->
+    let Fmt_fmtty_EBB (fmt1, fmtty1) = type_format_gen fmt0 fmtty_rest in
+    Fmt_fmtty_EBB (Formatting_gen (Open_stag, fmt1), fmtty1)
+  | Open_stag, _ -> raise Type_mismatch
+  | Open_box (Format (fmt1, str)), fmtty_rest ->
+    let Fmt_fmtty_EBB (fmt2, fmtty2) = type_format_gen fmt1 fmtty_rest in
     let Fmt_fmtty_EBB (fmt3, fmtty3) = type_format_gen fmt0 fmtty2 in
     Fmt_fmtty_EBB (Formatting_gen (Open_box (Format (fmt2, str)), fmt3), fmtty3)
 
@@ -1594,6 +1612,8 @@ fun k acc fmt -> match fmt with
     let k' kacc =
       make_printf k (Acc_formatting_gen (acc, Acc_open_tag kacc)) rest in
     make_printf k' End_of_acc fmt'
+  | Formatting_gen (Open_stag, rest) ->
+    fun stag -> make_printf k (Acc_formatting_gen (acc, Acc_open_stag stag)) rest
   | Formatting_gen (Open_box (Format (fmt', _)), rest) ->
     let k' kacc =
       make_printf k (Acc_formatting_gen (acc, Acc_open_box kacc)) rest in
@@ -1644,6 +1664,7 @@ fun k acc fmtty fmt -> match fmtty with
   | Alpha_ty rest           -> fun _ _ -> make_from_fmtty k acc rest fmt
   | Theta_ty rest           -> fun _ -> make_from_fmtty k acc rest fmt
   | Any_ty rest             -> fun _ -> make_from_fmtty k acc rest fmt
+  | Stag_ty rest            -> fun _ -> make_from_fmtty k acc rest fmt
   | Reader_ty _             -> assert false
   | Ignored_reader_ty _     -> assert false
   | Format_arg_ty (_, rest) -> fun _ -> make_from_fmtty k acc rest fmt
@@ -1850,6 +1871,8 @@ let rec make_iprintf : type a b c d e f state.
         make_iprintf k o rest
     | Formatting_gen (Open_tag (Format (fmt', _)), rest) ->
         make_iprintf (fun koc -> make_iprintf k koc rest) o fmt'
+    | Formatting_gen (Open_stag, rest) ->
+        const (make_iprintf k o rest)
     | Formatting_gen (Open_box (Format (fmt', _)), rest) ->
         make_iprintf (fun koc -> make_iprintf k koc rest) o fmt'
     | End_of_format ->
@@ -1898,6 +1921,8 @@ let rec output_acc o acc = match acc with
     output_acc o p; output_string o s;
   | Acc_formatting_gen (p, Acc_open_tag acc') ->
     output_acc o p; output_string o "@{"; output_acc o acc';
+  | Acc_formatting_gen (p, Acc_open_stag _stag) ->
+    output_acc o p; output_string o "@{"
   | Acc_formatting_gen (p, Acc_open_box acc') ->
     output_acc o p; output_string o "@["; output_acc o acc';
   | Acc_string_literal (p, s)
@@ -1918,6 +1943,8 @@ let rec bufput_acc b acc = match acc with
     bufput_acc b p; Buffer.add_string b s;
   | Acc_formatting_gen (p, Acc_open_tag acc') ->
     bufput_acc b p; Buffer.add_string b "@{"; bufput_acc b acc';
+  | Acc_formatting_gen (p, Acc_open_stag _stag) ->
+    bufput_acc b p; Buffer.add_string b "@{"
   | Acc_formatting_gen (p, Acc_open_box acc') ->
     bufput_acc b p; Buffer.add_string b "@["; bufput_acc b acc';
   | Acc_string_literal (p, s)
@@ -1939,6 +1966,8 @@ let rec strput_acc b acc = match acc with
     strput_acc b p; Buffer.add_string b s;
   | Acc_formatting_gen (p, Acc_open_tag acc') ->
     strput_acc b p; Buffer.add_string b "@{"; strput_acc b acc';
+  | Acc_formatting_gen (p, Acc_open_stag _stag) ->
+    strput_acc b p; Buffer.add_string b "@{"
   | Acc_formatting_gen (p, Acc_open_box acc') ->
     strput_acc b p; Buffer.add_string b "@["; strput_acc b acc';
   | Acc_string_literal (p, s)

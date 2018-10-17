@@ -15,6 +15,8 @@
 
 (* No comments, OCaml stdlib internal use only. *)
 
+type stag = ..
+
 type padty = Left | Right | Zeros
 
 type int_conv =
@@ -68,6 +70,7 @@ type formatting_lit =
 type ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen =
   | Open_tag : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
     ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen
+  | Open_stag : (stag -> 'f, 'b, 'c, 'e, 'e, 'f) formatting_gen
   | Open_box : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
     ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen
 
@@ -148,6 +151,11 @@ and ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
      'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
     ('x -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
      'x -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
+| Stag_ty :                                    (* Semantic stags *)
+    ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
+     'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
+    (stag -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
+     stag -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
 
 (* Scanf specific constructor. *)
 | Reader_ty :                                               (* %r  *)
