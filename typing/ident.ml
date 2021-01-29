@@ -152,9 +152,9 @@ let print_with_scope ppf id = print ~with_scope:true ppf id
 
 let print ppf id = print ~with_scope:false ppf id
 
-type 'a tbl =
+type 'a tree =
     Empty
-  | Node of 'a tbl * 'a data * 'a tbl * int
+  | Node of 'a tree * 'a data * 'a tree * int
 
 and 'a data =
   { ident: t;
@@ -347,6 +347,63 @@ let compare x y =
 
 let output oc id = output_string oc (unique_name id)
 let hash i = (Char.code (name i).[0]) lxor (stamp i)
+
+type 'a tbl = {
+  id : int ;
+  tree : 'a tree;
+}
+
+let log =
+  match Sys.getenv_opt "DUMPTREEOP" with
+  | None -> fun _ _ _ _ -> ()
+  | Some file ->
+      let oc = open_out file in
+      let formatter = Format.formatter_of_out_channel oc in
+      Format.fprintf formatter "File %s@." !Location.input_name;
+      fun t op args out ->
+        match out with
+        | None -> Format.fprintf formatter "%s(%t,%t)@." op t args 
+        | Some t' -> Format.fprintf formatter "%s(%t,%t) = %t@." op t args t'
+
+let new_id =
+  let r = ref 1 in
+  fun () -> let a = !r in incr r; a
+
+let pptree {id;tree} fmt =
+  Format.fprintf fmt "%i[%iw]"
+    id
+    (Obj.reachable_words @@ Obj.repr tree)
+
+let touch s args f t =
+  log (pptree t) s args None;
+  f t.tree
+
+let map s args f t =
+  let id = new_id () in
+  let tree = f t.tree in
+  let t' = { id ; tree } in
+  log (pptree t) s args (Some (pptree t'));
+  t'
+
+let dpp = Format.dprintf
+
+let empty = { id = 0; tree = empty }
+let add k v t =
+  map "add"         (dpp "%s" (unique_name k)) (fun t -> add k v t) t
+let remove k t =
+  map "remove"      (dpp "%s" (unique_name k)) (fun t -> remove k t) t
+let find_same k t =
+  touch "find_same" (dpp "%s" (unique_name k)) (fun t -> find_same k t) t
+let find_name s t =
+  touch "find_name" (dpp "%s" s)               (fun t -> find_name s t) t
+let find_all s t =
+  touch "find_all"  (dpp "%s" s)               (fun t -> find_all s t) t
+let fold_name f t z =
+  touch "fold_name" (dpp "")                   (fun t -> fold_name f t z) t
+let fold_all f t z =
+  touch "fold_all"  (dpp "")                   (fun t -> fold_all f t z) t
+let iter f t =
+  touch "iter"      (dpp "")                   (fun t -> iter f t) t
 
 let original_equal = equal
 include Identifiable.Make (struct
