@@ -359,6 +359,8 @@ let log =
   | Some file ->
       let oc = open_out_gen [Open_rdonly;Open_append] 0x599 file in
       Printf.fprintf oc "New File\n";
+      at_exit (fun () ->
+          Printf.fprintf oc "Closing File %s\n" !Location.input_name);
       fun t op args out ->
         match out with
         | None -> Printf.fprintf oc "%s(%t,%s)\n" op t args 
@@ -368,20 +370,22 @@ let new_id =
   let r = ref 1 in
   fun () -> let a = !r in incr r; a
 
-let pptree {id; _} fmt =
-  Printf.fprintf fmt "%i"
+let pptree ~mem {id; tree} fmt =
+  Printf.fprintf fmt "%i%s"
     id
-    (* (Obj.reachable_words @@ Obj.repr tree) *)
+    (if mem
+     then "[" ^ string_of_int (Obj.reachable_words @@ Obj.repr tree) ^ "]"
+     else "")
 
 let touch s args f t =
-  log (pptree t) s args None;
+  log (pptree ~mem:false t) s args None;
   f t.tree
 
 let map s args f t =
   let id = new_id () in
   let tree = f t.tree in
   let t' = { id ; tree } in
-  log (pptree t) s args (Some (pptree t'));
+  log (pptree ~mem:false t) s args (Some (pptree ~mem:true t'));
   t'
 
 let empty = { id = 0; tree = empty }
